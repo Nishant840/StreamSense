@@ -2,12 +2,19 @@ import logging
 import random
 import time
 import schedule
+from kafka_handler import KafkaLoggingHandler
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s service-c %(message)s"
 )
 logger = logging.getLogger("servie-c")
+
+kafka_handler = KafkaLoggingHandler(
+    bootstrap_servers="kafka:9092",
+    topic="raw-logs"
+)
+logger.addHandler(kafka_handler)
 
 cpu_usage = 0.0
 memory_usage = 0.0

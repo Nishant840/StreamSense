@@ -3,12 +3,19 @@ import random
 import asyncio
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from kafka_handler import KafkaLoggingHandler
 
 logging.basicConfig(
     level = logging.INFO,
     format="%(asctime)s %(levelname)s service-a %(message)s",
 )
 logger = logging.getLogger("service-a")
+
+kafka_handler = KafkaLoggingHandler(
+    bootstrap_servers="kafka:9092",
+    topic="raw-logs"
+)
+logger.addHandler(kafka_handler)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

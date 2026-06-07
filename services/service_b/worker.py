@@ -1,6 +1,7 @@
 import logging
 import random
 import time
+from kafka_handler import KafkaLoggingHandler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -8,6 +9,12 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("service-b")
+
+kafka_handler = KafkaLoggingHandler(
+    bootstrap_servers="kafka:9092",
+    topic="raw-logs"
+)
+logger.addHandler(kafka_handler)
 
 JOB_TYPES = [
     "send_email",
