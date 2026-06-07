@@ -35,3 +35,9 @@ services:
     container_name: service-b
     depends_on:
       - kafka
+
+  service-c:
+    build: ./services/service_c
+    container_name: service-c
+    depends_on:
+      - kafka
