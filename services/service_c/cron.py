@@ -8,7 +8,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s service-c %(message)s"
 )
-logger = logging.getLogger("servie-c")
+logger = logging.getLogger("service-c")
 
 kafka_handler = KafkaLoggingHandler(
     bootstrap_servers="kafka:9092",
