@@ -67,7 +67,7 @@ def job_db_backup():
 
     if success:
         logger.info(
-            f"Databse backup completed | duration={duration_s}s"
+            f"Database backup completed | duration={duration_s}s"
         )
     else:
         logger.error(
