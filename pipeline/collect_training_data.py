@@ -13,7 +13,7 @@ logger = logging.getLogger("collector")
 
 WINDOW_SIZE     = 50
 TARGET_WINDOWS  = 2000
-OUTPUT_FILE     = "../ml/train_data.py"
+OUTPUT_FILE     = "../ml/train_data.npy"
 
 def build_consumer() -> KafkaConsumer:
     return KafkaConsumer(
