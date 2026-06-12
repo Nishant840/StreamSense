@@ -12,10 +12,10 @@ CHECKPOINT_PATH = f"{CHECKPOINT_DIR}/best_model.pt"
 THRESHOLD_PATH  = f"{CHECKPOINT_DIR}/threshold.npy"
 
 BATCH_SIZE      = 32
-EPOCHS          = 20
+EPOCHS          = 40
 LEARNING_RATE   = 1e-3
 TRAIN_SPLIT     = 0.8
-THRESHOLD_PCT   = 95
+THRESHOLD_PCT   = 97
 
 DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
