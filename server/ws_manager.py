@@ -5,7 +5,7 @@ logger = logging.getLogger("ws-manager")
 
 class WebSocketManager:
 
-    def __int__(self):
+    def __init__(self):
         self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket) -> None:
