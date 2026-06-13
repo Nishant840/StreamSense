@@ -3,22 +3,19 @@ import torch
 import torch.nn as nn
 from model import LogAutoencoder
 
-EVAL_PATH       = "eval_data.npy"
-CHECKPOINT_PATH = "checkpoints/best_model.pt"
+CHECKPOINT_DIR  = "checkpoints"
+SERVICES        = ["service-a", "service-b", "service-c"]
 THRESHOLD_PATH  = "checkpoints/threshold.npy"
-
-WINDOW_SIZE = 50
-INPUT_DIM   = 8
-
 DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-def load_model() -> tuple[LogAutoencoder, float]:
+def load_model(service: str) -> tuple[LogAutoencoder, float]:
+    svc_dir = f"{CHECKPOINT_DIR}/{service}"
     model = LogAutoencoder().to(DEVICE)
     model.load_state_dict(
-        torch.load(CHECKPOINT_PATH, weights_only=True, map_location=DEVICE)
+        torch.load(f"{svc_dir}/best_model.pt", weights_only=True, map_location=DEVICE)
     )
     model.eval()
-    threshold = float(np.load(THRESHOLD_PATH))
+    threshold = float(np.load(f"{svc_dir}/threshold.npy"))
     return model, threshold
 
 def inject_error_spike(window: np.ndarray) -> np.ndarray:
@@ -65,39 +62,6 @@ def score_window(
         loss  = nn.MSELoss()(recon, tensor)
     return loss.item()
 
-def evaluate(
-    model: LogAutoencoder,
-    threshold: float,
-    eval_data: np.ndarray,
-) -> dict:
-    
-    results = {
-        "normal":           {"scores": [], "labels": []},
-        "error_spike":      {"scores": [], "labels": []},
-        "slowdown":         {"scores": [], "labels": []},
-        "unknown_template": {"scores": [], "labels": []},
-        "memory_leak":      {"scores": [], "labels": []}
-    }
-
-    for window in eval_data:
-        # normal window -> label 0
-        score = score_window(model, window)
-        results["normal"]["scores"].append(score)
-        results["normal"]["labels"].append(0)
-
-        # anomaly windows -> label 1
-        for anomaly_type, inject_fn in [
-            ("error_spike",     inject_error_spike),
-            ("slowdown",        inject_slowdown),
-            ("unknown_template",inject_unknown_template),
-            ("memory_leak",     inject_memory_leak),
-        ]:
-            anomaly_window  = inject_fn(window)
-            score           = score_window(model, anomaly_window)
-            results[anomaly_type]["scores"].append(score)
-            results[anomaly_type]["labels"].append(1)
-
-    return results
 
 def compute_metrics(
         scores:     list[float],
@@ -134,71 +98,74 @@ def compute_metrics(
         "tp": tp, "fp": fp, "tn": tn, "fn": fn,
     }
 
-def print_results(
-    results:   dict,
-    threshold: float,
+def evaluate_service(
+    service:    str,
+    model:      LogAutoencoder,
+    threshold:  float,
+    eval_data:  np.ndarray,
 ) -> None:
-
-    print(f"\n{'='*60}")
-    print(f"  StreamSense Anomaly Detection — Evaluation Report")
-    print(f"{'='*60}")
-    print(f"  Threshold: {threshold:.6f}")
-    print(f"{'='*60}\n")
+    injectors = [
+        ("error_spike",         inject_error_spike),
+        ("slowdown",            inject_slowdown),
+        ("unknown_template",    inject_unknown_template),
+        ("memory_leak",         inject_memory_leak),
+    ]
 
     all_scores = []
     all_labels = []
 
-    for anomaly_type, data in results.items():
-        is_anomaly = anomaly_type != "normal"
-        scores     = data["scores"]
-        labels     = data["labels"]
+    normal_scores       = []
+    anomaly_by_type     = {name: [] for name, _ in injectors}
+    
+    for window in eval_data:
+        score = score_window(model, window)
+        normal_scores.append(score)
+        all_scores.append(score)
+        all_labels.append(0)
 
-        all_scores.extend(scores)
-        all_labels.extend(labels)
+        for name, fn in injectors:
+            a_score = score_window(model, fn(window))
+            anomaly_by_type[name].append(a_score)
+            all_scores.append(a_score)
+            all_labels.append(1)
 
-        avg_score = np.mean(scores)
-        detection = (
-            sum(1 for s in scores if s > threshold) / len(scores)
-            if is_anomaly
-            else sum(1 for s in scores if s <= threshold) / len(scores)
-        )
-
-        print(f"  [{anomaly_type.upper()}]")
-        print(f"    Avg score:   {avg_score:.6f}")
-        print(f"    {'Detection' if is_anomaly else 'Correct normal'} rate: {detection*100:.1f}%")
-        print()
-
-    print(f"{'='*60}")
-    print(f"  Overall Metrics (all anomaly types combined)")
-    print(f"{'='*60}")
-
+    print(f"\n{'='*55}")
+    print(f"  {service.upper()}")
+    print(f"{'='*55}")
+    print(f"  Threshold: {threshold:.6f}")
+    print(f"  [NORMAL] avg={np.mean(normal_scores):.6f} | "
+          f"correct={sum(s <= threshold for s in normal_scores)/len(normal_scores)*100:.1f}%")
+    
+    for name, scores in anomaly_by_type.items():
+        detected = sum(s > threshold for s in scores) / len(scores) * 100
+        print(f"  [{name.upper()}] avg={np.mean(scores):.6f} | "
+              f"detection={detected:.1f}%")
+        
     metrics = compute_metrics(all_scores, all_labels, threshold)
+    print(f"\n  Precision={metrics['precision']} | "
+          f"Recall={metrics['recall']} | "
+          f"F1={metrics['f1']}")
+    print(f"  TP={metrics['tp']} FP={metrics['fp']} "
+          f"TN={metrics['tn']} FN={metrics['fn']}")
 
-    print(f"  Precision: {metrics['precision']:.4f}")
-    print(f"  Recall:    {metrics['recall']:.4f}")
-    print(f"  F1 Score:  {metrics['f1']:.4f}")
-    print(f"  Accuracy:  {metrics['accuracy']:.4f}")
-    print()
-    print(f"  TP: {metrics['tp']} | FP: {metrics['fp']} | "
-          f"TN: {metrics['tn']} | FN: {metrics['fn']}")
-    print(f"{'='*60}\n")
-
-    target = "✅ TARGET MET (F1 > 0.80)" if metrics["f1"] > 0.80 else "❌ Below target"
+    target = "✅ F1 > 0.80" if metrics["f1"] > 0.80 else "❌ Below target"
     print(f"  {target}")
-    print()
+
 
 def main():
-    print("Loading model and threshold...")
-    model, threshold = load_model()
+    print("Loading model...")
+    overall_scores = []
+    overall_labels = []
 
-    print("Loading evaluation data...")
-    eval_data = np.load(EVAL_PATH)
-    print(f"Eval windows: {eval_data.shape}")
+    for service in SERVICES:
+        model, threshold = load_model(service)
+        svc             = service.replace("-", "_")
+        eval_data       = np.load(f"eval_data_{svc}.npy")
 
-    print("Running evaluation...")
-    results = evaluate(model, threshold, eval_data)
+        evaluate_service(service, model, threshold, eval_data)
 
-    print_results(results, threshold)
+    print(f"\n{'='*55}")
+    print("    Done!")
 
 if __name__ == "__main__":
     main()
