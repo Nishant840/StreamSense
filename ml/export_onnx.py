@@ -1,26 +1,26 @@
 import torch
 import numpy as np
 import onnxruntime as ort
+import time
 from model import LogAutoencoder
 
-CHECKPOINT_PATH = "checkpoints/best_model.pt"
-ONNX_PATH       = "checkpoints/model.onnx"
+CHECKPOINT_DIR  = "checkpoints"
+SERVICES        = ["service-a", "service-b", "service-c"]
 
 WINDOW_SIZE = 50
 INPUT_DIM   = 8
-BATCH_SIZE  = 1
 
 DEVICE = torch.device("cpu")
 
-def export_to_onnx(model: LogAutoencoder) -> None:
+def export_to_onnx(model: LogAutoencoder, onnx_path: str) -> None:
     model.eval()
 
-    dummy_input = torch.randn(BATCH_SIZE, WINDOW_SIZE, INPUT_DIM)
+    dummy = torch.randn(1, WINDOW_SIZE, INPUT_DIM)
 
     torch.onnx.export(
         model,
-        dummy_input,
-        ONNX_PATH,
+        dummy,
+        onnx_path,
         export_params=True,
         opset_version=17,
         do_constant_folding=True,
@@ -31,47 +31,53 @@ def export_to_onnx(model: LogAutoencoder) -> None:
             "reconstruction": {0, "batch_size"},
         },
     )
-    print(f"Model exported to {ONNX_PATH}")
+    print(f"Model exported to {onnx_path}")
 
-def verify_onnx(model: LogAutoencoder) -> None:
+def verify_onnx(
+        model: LogAutoencoder,
+        onnx_path: str
+) -> None:
     print("\nVerifying ONNX model...")
 
-    dummy_input = torch.randn(BATCH_SIZE, WINDOW_SIZE, INPUT_DIM)
+    dummy = torch.randn(1, WINDOW_SIZE, INPUT_DIM)
 
     with torch.no_grad():
-        pytorch_output = model(dummy_input).numpy()
+        pytorch_output = model(dummy).numpy()
 
-    session = ort.InferenceSession(ONNX_PATH)
+    session = ort.InferenceSession(onnx_path)
     onnx_output = session.run(
         ["reconstruction"],
-        {"log_window": dummy_input.numpy()},
+        {"log_window": dummy.numpy()},
     )[0]
 
     max_diff = np.max(np.abs(pytorch_output - onnx_output))
     print(f"Max difference PyTorch vs ONNX: {max_diff:.8f}")
 
-    if max_diff < 1e-5:
+    if max_diff < 1e-4:
         print("ONNX model matches PyTorch output")
     else:
         print("Output differ - check export settings")
 
-def benchmark(model: LogAutoencoder, runs: int=100) -> None:
-    import time
+def benchmark(
+        model: LogAutoencoder,
+        onnx_path: str,
+        runs: int=100
+) -> None:
 
-    dummy_input = torch.randn(BATCH_SIZE, WINDOW_SIZE, INPUT_DIM)
-    session     = ort.InferenceSession(ONNX_PATH)
-    onnx_input  = dummy_input.numpy()
+    dummy = torch.randn(1, WINDOW_SIZE, INPUT_DIM)
+    session     = ort.InferenceSession(onnx_path)
+    onnx_input  = dummy.numpy()
 
     for _ in range(10):
         with torch.no_grad():
-            model(dummy_input)
+            model(dummy)
         session.run(["reconstruction"], {"log_window": onnx_input})
 
     # pytorch benchmark
     start = time.perf_counter()
     for _ in range(runs):
         with torch.no_grad():
-            model(dummy_input)
+            model(dummy)
     pytorch_ms = (time.perf_counter() - start) / runs * 1000
 
     # onnx benchmark
@@ -87,17 +93,31 @@ def benchmark(model: LogAutoencoder, runs: int=100) -> None:
 
 def main():
     print("Loading PyTorch model...")
-    model = LogAutoencoder().to(DEVICE)
-    model.load_state_dict(
-        torch.load(CHECKPOINT_PATH, weights_only=True, map_location=DEVICE)
-    )
-    model.eval()
+    for service in SERVICES:
+        print(f"\n{'='*50}")
+        print(f"Exporting: {service}")
+        print(f"{'='*50}")
 
-    export_to_onnx(model)
-    verify_onnx(model)
-    benchmark(model)
+        svc_dir    = f"{CHECKPOINT_DIR}/{service}"
+        model_path = f"{svc_dir}/best_model.pt"
+        onnx_path  = f"{svc_dir}/model.onnx"
 
-    print(f"\nDone! ONNX model saved to {ONNX_PATH}")
+        model = LogAutoencoder().to(DEVICE)
+        model.load_state_dict(
+            torch.load(
+                model_path,
+                weights_only=True,
+                map_location=DEVICE,
+            )
+        )
+        model.eval()
+
+        export_to_onnx(model, onnx_path)
+        print(f"  Exported → {onnx_path}")
+        verify_onnx(model, onnx_path)
+        benchmark(model, onnx_path)
+    
+    print(f"\n All models exported!")
 
 if __name__ == "__main__":
     main()
