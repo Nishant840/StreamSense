@@ -14,20 +14,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger("anomaly-scorer")
 
-ONNX_PATH       = "../ml/checkpoints/model.onnx"
-THRESHOLD_PATH  = "../ml/checkpoints/threshold.npy"
+CHECKPOINT_DIR  = "../ml/checkpoints"
+SERVICES        = ["service-a", "service-b", "service-c"]
 KAFKA_BOOTSTRAP = "localhost:29092"
 PARSED_TOPIC    = "parsed-logs"
-GROUP_ID        = "anomaly-scorer-group"
+GROUP_ID        = "anomaly-scorer-group-v2"
 WINDOW_SIZE     = 50
 FASTAPI_URL     = "http://localhost:8000/anomaly"
 
 
-def load_model() -> tuple[ort.InferenceSession, float]:
-    session     = ort.InferenceSession(ONNX_PATH)
-    threshold   = float(np.load(THRESHOLD_PATH))
-    logger.info(f"Model loaded | threshold={threshold:.6f}")
-    return session, threshold
+def load_model() -> tuple[
+    dict[str, ort.InferenceSession],
+    dict[str, float]
+]:
+    sessions   = {}
+    thresholds = {}
+
+    for service in SERVICES:
+        svc_dir     = f"{CHECKPOINT_DIR}/{service}"
+        session     = ort.InferenceSession(f"{svc_dir}/model.onnx")
+        threshold   = float(np.load(f"{svc_dir}/threshold.npy"))
+        sessions[service]   = session
+        thresholds[service] = threshold
+        logger.info(
+            f"Loaded model | service={service} threshold={threshold:.6f}"
+        )
+
+    return sessions, thresholds
 
 def build_consumer() -> KafkaConsumer:
     return KafkaConsumer(
@@ -74,8 +87,9 @@ def report_anomaly(
 
 def main():
     logger.info("Anomaly scorer starting...")
-    session, threshold = load_model()
+    sessions, thresholds = load_model()
     consumer           = build_consumer()
+
     windows: dict[str, deque] = defaultdict(
         lambda: deque(maxlen=WINDOW_SIZE)
     )
@@ -83,28 +97,33 @@ def main():
     logger.info(f"Consuming from {PARSED_TOPIC}...")
 
     for message in consumer:
-        parsed_log  = message.value
-        service     = parsed_log.get("service", "unknown")
-        features    = extract_features(parsed_log)
+        parsed_log = message.value
+        service    = parsed_log.get("service", "unknown")
+
+        if service not in sessions:
+            consumer.commit()
+            continue
+
+        features   = extract_features(parsed_log)
 
         windows[service].append(features)
 
         if len(windows[service]) == WINDOW_SIZE:
-            score = score_window(session, windows[service])
+            session   = sessions[service]
+            threshold = thresholds[service]
+            score     = score_window(session, windows[service])
+
+            print(f"service={service} score={score:.6f} threshold={threshold:.6f}")
 
             if score > threshold:
                 logger.warning(
                     f"ANOMALY DETECTED | "
                     f"service={service} "
-                    f"score={score:.6f} "
-                    f"threshold={threshold:.6f}"
+                    f"score={score:.6f} | "
+                    f"msg={parsed_log.get('message', '')[:50]}"
                 )
                 report_anomaly(parsed_log, score)
-            else:
-                logger.debug(
-                    f"Normal | service={service} score={score:.6f}"
-                )
-        
+
         consumer.commit()
 
 if __name__ == "__main__":
