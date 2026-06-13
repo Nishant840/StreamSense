@@ -15,7 +15,7 @@ BATCH_SIZE      = 32
 EPOCHS          = 40
 LEARNING_RATE   = 1e-3
 TRAIN_SPLIT     = 0.8
-THRESHOLD_PCT   = 97
+THRESHOLD_PCT   = 99
 
 DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 

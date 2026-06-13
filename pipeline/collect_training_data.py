@@ -12,65 +12,94 @@ logging.basicConfig(
 logger = logging.getLogger("collector")
 
 WINDOW_SIZE     = 50
-TOTAL_WINDOWS  = 3000
+SERVICES        = ["service-a", "service-b", "service-c"]
 
-TRAIN_SIZE = 2000
-VAL_SIZE   = 500
-EVAL_SIZE  = 500
+WINDOWS_PER_SERVICE = {
+    "service-a": 1000,
+    "service-b": 1000,
+    "service-c": 1000,
+}
 
-TRAIN_OUTPUT     = "../ml/train_data.npy"
-VAL_OUTPUT       = "../ml/val_data.npy"
-EVAL_OUTPUT      = "../ml/eval_data.npy"
+TRAIN_RATIO = 0.667
+VAL_RATIO   = 0.167
+EVAL_RATIO  = 0.166
+
+OUTPUT_DIR  = "../ml"
 
 def build_consumer() -> KafkaConsumer:
     return KafkaConsumer(
         "parsed-logs",
         bootstrap_servers="localhost:29092",
-        group_id="training-data-collector-v2",
+        group_id="training-data-collector-v3",
         auto_offset_reset="earliest",
         value_deserializer=lambda v: json.loads(v.decode("utf-8"))
     )
 
 def main():
+    total_needed = sum(WINDOWS_PER_SERVICE.values())
     logger.info(
-        f"Starting data collection | "
-        f"total={TOTAL_WINDOWS} | "
-        f"train={TRAIN_SIZE} | val={VAL_SIZE} | eval={EVAL_SIZE}"
+        f"Starting balanced collection | "
+        f"per service={WINDOWS_PER_SERVICE} | "
+        f"total={total_needed}"
     )
 
     consumer    = build_consumer()
-    window      = deque(maxlen=WINDOW_SIZE)
-    windows     = []
+
+    windows: dict[str,list] = {s: [] for s in SERVICES}
+    buffers: dict[str, deque] = {
+        s: deque(maxlen=WINDOW_SIZE) for s in SERVICES
+    }
 
     for message in consumer:
         parsed_log = message.value
-        features = extract_features(parsed_log)
-        window.append(features)
+        service    = parsed_log.get("service", "")
 
-        if len(window) == WINDOW_SIZE:
-            windows.append(list(window))
+        if service not in SERVICES:
+            continue
 
-            if len(windows) % 200 == 0:
-                logger.info(f"Collected {len(windows)}/{TOTAL_WINDOWS} windows")
-
-            if len(windows) >= TOTAL_WINDOWS:
+        if len(windows[service]) >= WINDOWS_PER_SERVICE[service]:
+            if all(
+                len(windows[s]) >= WINDOWS_PER_SERVICE[s]
+                for s in SERVICES
+            ):
                 break
+            continue
 
-    data = np.array(windows, dtype=np.float32)
-    
-    train_data = data[:TRAIN_SIZE]
-    val_data   = data[TRAIN_SIZE:TRAIN_SIZE+VAL_SIZE]
-    eval_data  = data[TRAIN_SIZE+VAL_SIZE:]
 
-    np.save(TRAIN_OUTPUT, train_data)
-    np.save(VAL_OUTPUT, val_data)
-    np.save(EVAL_OUTPUT, eval_data)
+        features = extract_features(parsed_log)
+        buffers[service].append(features)
 
-    logger.info(f"Saved train: {train_data.shape} -> {TRAIN_OUTPUT}")
-    logger.info(f"Saved val: {val_data.shape} -> {VAL_OUTPUT}")
-    logger.info(f"Saved eval: {eval_data.shape} -> {EVAL_OUTPUT}")
-    
+        if len(buffers[service]) == WINDOW_SIZE:
+            windows[service].append(list(buffers[service]))
+
+            collected = {s: len(windows[s]) for s in SERVICES}
+            if sum(collected.values()) % 100 == 0:
+                logger.info(f"Progress: {collected}")
+
     consumer.close()
+
+    for service in SERVICES:
+        data        = np.array(windows[service], dtype=np.float32)
+        train_end   = int(len(data) * TRAIN_RATIO)
+        val_end     = int(len(data) * (TRAIN_RATIO + VAL_RATIO))
+
+        train_data  = data[:train_end]
+        val_data    = data[train_end:val_end]
+        eval_data   = data[val_end:]
+
+        svc = service.replace("-", "_")
+        np.save(f"{OUTPUT_DIR}/train_data_{svc}.npy", train_data)
+        np.save(f"{OUTPUT_DIR}/val_data_{svc}.npy", val_data)
+        np.save(f"{OUTPUT_DIR}/eval_data_{svc}.npy", eval_data)
+
+        logger.info(
+            f"{service} -> "
+            f"train={train_data.shape} | "
+            f"val={val_data.shape} | "
+            f"eval={eval_data.shape}"
+        )
+
+    logger.info("Collection complete!")
 
 if __name__ == "__main__":
     main()
