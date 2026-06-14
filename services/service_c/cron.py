@@ -2,6 +2,9 @@ import logging
 import random
 import time
 import schedule
+import threading
+from fastapi import FastAPI
+import uvicorn
 from kafka_handler import KafkaLoggingHandler
 
 logging.basicConfig(
@@ -38,17 +41,17 @@ def job_health_check():
         f"disk={disk_usage: .1f}%"
     )
     
-    if cpu_usage > 85:
+    if cpu_usage > 150:
         logger.warning(f"High CPU usage detected | cpu={cpu_usage:.1f}%")
     
-    if memory_usage > 80:
+    if memory_usage > 150:
         logger.warning(f"High memory usage detected | memory={memory_usage:.1f}%")
 
     
 def job_cleanup():
     files_cleaned   = random.randint(5,50)
     size_mb         = random.randint(10,100)
-    success         = random.random() > 0.05
+    success         = random.random() > 0.15
 
     if success:
         logger.info(
@@ -63,7 +66,7 @@ def job_cleanup():
 def job_db_backup():
     duration_s  = int(random.gauss(45, 10))
     duration_s  = max(10, duration_s)
-    success     = random.random() > 0.03
+    success     = random.random() > 0.15
 
     if success:
         logger.info(
@@ -84,17 +87,36 @@ def job_cache_refresh():
         f"Cache refresh completed | keys={keys_refreshed} duration={duration_ms}ms"
     )
 
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "service-c"}
+
+@app.post("/inject/error-spike")
+def inject_error_spike():
+    for _ in range(30):
+        logger.error("Database backup failed | duration=0s error=ManualInjectionSpike")
+        time.sleep(0.1)
+    return {"injected": "error-spike"}
+
+def run_api():
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)
+
 # Schedule jobs
-schedule.every(10).seconds.do(job_health_check)
-schedule.every(30).seconds.do(job_cleanup)
-schedule.every(60).seconds.do(job_db_backup)
-schedule.every(20).seconds.do(job_cache_refresh)
+schedule.every(1).seconds.do(job_health_check)
+schedule.every(3).seconds.do(job_cleanup)
+schedule.every(5).seconds.do(job_db_backup)
+schedule.every(2).seconds.do(job_cache_refresh)
 
 def main():
+    api_thread = threading.Thread(target=run_api, daemon=True)
+    api_thread.start()
+
     logger.info("Cron scheduler started")
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        time.sleep(random.uniform(0.3, 0.8))
 
 if __name__ == "__main__":
     main()

@@ -26,15 +26,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 ENDPOINTS = ["/api/users", "/api/orders", "/api/products", "/api/auth"]
-STATUS_CODES = [200, 200, 200, 200, 201, 400, 404, 500]
+STATUS_CODES = [200, 200, 200, 200, 201, 400, 500, 503]
 
-response_time_multiplier = 1
+
 
 async def emit_logs():
     while True:
         endpoint = random.choice(ENDPOINTS)
         status = random.choice(STATUS_CODES)
-        latency = int(random.gauss(120,30) * response_time_multiplier)
+        latency = int(random.gauss(120,30))
         latency = max(10,latency)
 
         if status >= 500:
@@ -66,21 +66,4 @@ async def inject_error_spike():
         await asyncio.sleep(0.1)
     return {
         "injected" "error-spike"
-    }
-
-@app.post("/inject/slowdown")
-async def inject_slowdown():
-    global response_time_multiplier
-    response_time_multiplier = 10
-    return {
-        "injected": "slowdown",
-        "multiplier": 10
-    }
-
-@app.post("/inject/reset")
-async def inject_reset():
-    global response_time_multiplier
-    response_time_multiplier = 1
-    return {
-        "injected": "reset"
     }
