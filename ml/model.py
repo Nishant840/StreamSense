@@ -7,7 +7,7 @@ class LogAutoencoder(nn.Module):
             self,
             input_dim:      int = 8,
             window_size:    int = 50,
-            latent_dim:     int = 16,
+            latent_dim:     int = 4,
     ):
         super().__init__()
         
@@ -16,36 +16,21 @@ class LogAutoencoder(nn.Module):
         self.latent_dim     = latent_dim
         self.flat_dim       = input_dim * window_size #400
 
-        self.encoder = nn.LSTM(
-            input_size=input_dim, 
-            hidden_size=latent_dim, 
-            num_layers=1, 
-            batch_first=True
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, 32),
+            nn.ReLU(),
+            nn.Linear(32, latent_dim),
+            nn.ReLU(),
+            nn.Linear(latent_dim, 32),
+            nn.ReLU(),
+            nn.Linear(32, input_dim),
+            nn.Sigmoid()
         )
-        self.decoder = nn.LSTM(
-            input_size=latent_dim, 
-            hidden_size=latent_dim, 
-            num_layers=1, 
-            batch_first=True
-        )
-        self.output_layer = nn.Linear(latent_dim, input_dim)
-        self.sigmoid = nn.Sigmoid()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        batch_size = x.shape[0]
-        
         # x shape: (batch_size, window_size, input_dim)
-        _, (hidden, _) = self.encoder(x)
-        
-        # hidden shape: (1, batch_size, latent_dim)
-        # We need to feed this hidden state as input to the decoder for `window_size` steps
-        hidden = hidden.transpose(0, 1) # (batch_size, 1, latent_dim)
-        decoder_input = hidden.repeat(1, self.window_size, 1) # (batch_size, window_size, latent_dim)
-        
-        decoder_out, _ = self.decoder(decoder_input) # (batch_size, window_size, latent_dim)
-        out = self.output_layer(decoder_out) # (batch_size, window_size, input_dim)
-        
-        return self.sigmoid(out)
+        # nn.Linear automatically broadcasts over the window_size dimension
+        return self.network(x)
     
     def reconstruction_loss(self, x: torch.Tensor, recon: torch.Tensor) -> torch.Tensor:
         return nn.MSELoss()(recon, x)

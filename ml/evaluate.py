@@ -6,7 +6,7 @@ from model import LogAutoencoder
 CHECKPOINT_DIR  = "checkpoints"
 SERVICES        = ["service-a", "service-b", "service-c"]
 THRESHOLD_PATH  = "checkpoints/threshold.npy"
-DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+DEVICE = torch.device("cpu")
 
 def load_model(service: str) -> tuple[LogAutoencoder, float]:
     svc_dir = f"{CHECKPOINT_DIR}/{service}"
@@ -37,7 +37,7 @@ def inject_slowdown(window: np.ndarray) -> np.ndarray:
 def inject_unknown_template(window: np.ndarray) -> np.ndarray:
     window = window.copy()
     # template_id feature → very high value never seen in training
-    for i in range(10, 40):
+    for i in range(20, 50):
         window[i][2] = 0.99   # template_id = 99 (unknown)
         window[i][0] = 0.75   # ERROR level
         window[i][4] = 1.0    # is_eror
@@ -161,6 +161,10 @@ def main():
         model, threshold = load_model(service)
         svc             = service.replace("-", "_")
         eval_data       = np.load(f"eval_data_{svc}.npy")
+        
+        # Filter out native errors from eval_data so we evaluate the baseline correctly
+        mask_eval = ~((eval_data[:, -1, 4] == 1.0) | (eval_data[:, -1, 0] >= 0.75))
+        eval_data = eval_data[mask_eval]
 
         evaluate_service(service, model, threshold, eval_data)
 

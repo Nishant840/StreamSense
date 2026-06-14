@@ -15,15 +15,22 @@ THRESHOLD_PCT   = 99
 
 SERVICES = ["service-a", "service-b", "service-c"]
 
-DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+DEVICE = torch.device("cpu")
 
 def load_data(service: str) -> tuple[DataLoader, DataLoader]:
     svc        = service.replace("-", "_")
-    train_data = np.load(f"train_data_{svc}.npy")
-    val_data   = np.load(f"val_data_{svc}.npy")
+    train_data = np.load(f"train_data_{svc}.npy").reshape(-1, 8)
+    val_data   = np.load(f"val_data_{svc}.npy").reshape(-1, 8)
 
-    train_data = torch.tensor(train_data, dtype=torch.float32)
-    val_data   = torch.tensor(val_data,   dtype=torch.float32)
+    # Filter out individual error logs so the model ONLY trains on purely normal logs
+    mask_train = ~((train_data[:, 4] == 1.0) | (train_data[:, 0] >= 0.75))
+    train_data = train_data[mask_train]
+
+    mask_val = ~((val_data[:, 4] == 1.0) | (val_data[:, 0] >= 0.75))
+    val_data = val_data[mask_val]
+
+    train_data = torch.tensor(train_data[:, np.newaxis, :], dtype=torch.float32)
+    val_data   = torch.tensor(val_data[:, np.newaxis, :],   dtype=torch.float32)
     
     train_ds     = TensorDataset(train_data)
     val_ds       = TensorDataset(val_data)
@@ -124,7 +131,7 @@ def calculate_threshold(
             last_log_mse = mse_per_log[:, -1]
             all_losses.extend(last_log_mse.cpu().tolist())
 
-    threshold = float(np.percentile(all_losses, THRESHOLD_PCT))
+    threshold = max(float(np.percentile(all_losses, THRESHOLD_PCT)), 0.01)
     svc_dir   = f"{CHECKPOINT_DIR}/{service}"
     np.save(f"{svc_dir}/threshold.npy", np.array(threshold))
 
