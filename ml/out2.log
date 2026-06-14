@@ -1,0 +1,157 @@
+Using device: cpu
+==================================================
+Training: service-a
+==================================================
+   Train size: 21501 | Val size: 5294
+  Epoch 01/40 | train=0.017209 | val=0.000052 | saved
+  Epoch 02/40 | train=0.000044 | val=0.000039 | saved
+  Epoch 03/40 | train=0.000038 | val=0.000037 | saved
+  Epoch 04/40 | train=0.000037 | val=0.000036 | saved
+  Epoch 05/40 | train=0.000036 | val=0.000036 | saved
+  Epoch 06/40 | train=0.000035 | val=0.000034 | saved
+  Epoch 07/40 | train=0.000035 | val=0.000033 | saved
+  Epoch 08/40 | train=0.000034 | val=0.000033 | saved
+  Epoch 09/40 | train=0.000033 | val=0.000031 | saved
+  Epoch 10/40 | train=0.000031 | val=0.000029 | saved
+  Epoch 11/40 | train=0.000030 | val=0.000028 | saved
+  Epoch 12/40 | train=0.000028 | val=0.000026 | saved
+  Epoch 13/40 | train=0.000025 | val=0.000022 | saved
+  Epoch 14/40 | train=0.000018 | val=0.000013 | saved
+  Epoch 15/40 | train=0.000010 | val=0.000008 | saved
+  Epoch 16/40 | train=0.000008 | val=0.000007 | saved
+  Epoch 17/40 | train=0.000008 | val=0.000007 | saved
+  Epoch 18/40 | train=0.000007 | val=0.000007 | saved
+  Epoch 19/40 | train=0.000007 | val=0.000007 | saved
+  Epoch 20/40 | train=0.000007 | val=0.000006 | saved
+  Epoch 21/40 | train=0.000007 | val=0.000006 | saved
+  Epoch 22/40 | train=0.000006 | val=0.000006 | saved
+  Epoch 23/40 | train=0.000006 | val=0.000006 | saved
+  Epoch 24/40 | train=0.000006 | val=0.000006 | saved
+  Epoch 25/40 | train=0.000006 | val=0.000005 | saved
+  Epoch 26/40 | train=0.000005 | val=0.000005 | saved
+  Epoch 27/40 | train=0.000005 | val=0.000004 | saved
+  Epoch 28/40 | train=0.000004 | val=0.000003 | saved
+  Epoch 29/40 | train=0.000002 | val=0.000002 | saved
+  Epoch 30/40 | train=0.000001 | val=0.000000 | saved
+  Epoch 31/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 32/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 33/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 34/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 35/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 36/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 37/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 38/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 39/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 40/40 | train=0.000000 | val=0.000000 | saved
+
+Calculating anomaly threhold...
+    Threshold (99th percentile): 0.000000
+Min loss: 0.000000
+Max loss: 0.000010
+Mean loss: 0.000000
+    service-a done | threshold=0.000000
+
+==================================================
+Training: service-b
+==================================================
+   Train size: 32243 | Val size: 8057
+  Epoch 01/40 | train=0.006452 | val=0.000040 | saved
+  Epoch 02/40 | train=0.000035 | val=0.000033 | saved
+  Epoch 03/40 | train=0.000032 | val=0.000031 | saved
+  Epoch 04/40 | train=0.000030 | val=0.000031 | saved
+  Epoch 05/40 | train=0.000030 | val=0.000029 | saved
+  Epoch 06/40 | train=0.000029 | val=0.000028 | saved
+  Epoch 07/40 | train=0.000028 | val=0.000027 | saved
+  Epoch 08/40 | train=0.000027 | val=0.000026 | saved
+  Epoch 09/40 | train=0.000025 | val=0.000025 | saved
+  Epoch 10/40 | train=0.000023 | val=0.000021 | saved
+  Epoch 11/40 | train=0.000019 | val=0.000015 | saved
+  Epoch 12/40 | train=0.000008 | val=0.000001 | saved
+  Epoch 13/40 | train=0.000001 | val=0.000000 | saved
+  Epoch 14/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 15/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 16/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 17/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 18/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 19/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 20/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 21/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 22/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 23/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 24/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 25/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 26/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 27/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 28/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 29/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 30/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 31/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 32/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 33/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 34/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 35/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 36/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 37/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 38/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 39/40 | train=0.000000 | val=0.000000 | saved
+  Epoch 40/40 | train=0.000000 | val=0.000000 | saved
+
+Calculating anomaly threhold...
+    Threshold (99th percentile): 0.000000
+Min loss: 0.000000
+Max loss: 0.000002
+Mean loss: 0.000000
+    service-b done | threshold=0.000000
+
+==================================================
+Training: service-c
+==================================================
+   Train size: 33103 | Val size: 8288
+  Epoch 01/40 | train=0.016888 | val=0.000453 | saved
+  Epoch 02/40 | train=0.000371 | val=0.000324 | saved
+  Epoch 03/40 | train=0.000278 | val=0.000242 | saved
+  Epoch 04/40 | train=0.000212 | val=0.000188 | saved
+  Epoch 05/40 | train=0.000171 | val=0.000162 | saved
+  Epoch 06/40 | train=0.000148 | val=0.000140 | saved
+  Epoch 07/40 | train=0.000107 | val=0.000088 | saved
+  Epoch 08/40 | train=0.000076 | val=0.000070 | saved
+  Epoch 09/40 | train=0.000065 | val=0.000061 | saved
+  Epoch 10/40 | train=0.000057 | val=0.000055 | saved
+  Epoch 11/40 | train=0.000049 | val=0.000051 | saved
+  Epoch 12/40 | train=0.000044 | val=0.000041 | saved
+  Epoch 13/40 | train=0.000040 | val=0.000040 | saved
+  Epoch 14/40 | train=0.000037 | val=0.000037 | saved
+  Epoch 15/40 | train=0.000035 | val=0.000035 | saved
+  Epoch 16/40 | train=0.000033 | val=0.000034 | saved
+  Epoch 17/40 | train=0.000030 | val=0.000027 | saved
+  Epoch 18/40 | train=0.000025 | val=0.000023 | saved
+  Epoch 19/40 | train=0.000021 | val=0.000020 | saved
+  Epoch 20/40 | train=0.000017 | val=0.000016 | saved
+  Epoch 21/40 | train=0.000016 | val=0.000014 | saved
+  Epoch 22/40 | train=0.000015 | val=0.000014 | saved
+  Epoch 23/40 | train=0.000014 | val=0.000013 | saved
+  Epoch 24/40 | train=0.000013 | val=0.000012 | saved
+  Epoch 25/40 | train=0.000013 | val=0.000012 | saved
+  Epoch 26/40 | train=0.000012 | val=0.000012 | saved
+  Epoch 27/40 | train=0.000011 | val=0.000012 | saved
+  Epoch 28/40 | train=0.000011 | val=0.000009 | saved
+  Epoch 29/40 | train=0.000010 | val=0.000009 | saved
+  Epoch 30/40 | train=0.000009 | val=0.000008 | saved
+  Epoch 31/40 | train=0.000008 | val=0.000008 | saved
+  Epoch 32/40 | train=0.000007 | val=0.000007 | saved
+  Epoch 33/40 | train=0.000007 | val=0.000006 | saved
+  Epoch 34/40 | train=0.000007 | val=0.000006 | saved
+  Epoch 35/40 | train=0.000007 | val=0.000006 | saved
+  Epoch 36/40 | train=0.000006 | val=0.000006 | saved
+  Epoch 37/40 | train=0.000006 | val=0.000006 | saved
+  Epoch 38/40 | train=0.000006 | val=0.000005 | saved
+  Epoch 39/40 | train=0.000006 | val=0.000005 | saved
+  Epoch 40/40 | train=0.000006 | val=0.000006 | saved
+
+Calculating anomaly threhold...
+    Threshold (99th percentile): 0.000067
+Min loss: 0.000000
+Max loss: 0.000191
+Mean loss: 0.000005
+    service-c done | threshold=0.000067
+
