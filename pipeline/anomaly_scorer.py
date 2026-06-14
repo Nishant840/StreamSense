@@ -63,7 +63,7 @@ def score_window(
         {"log_window": window_array},
     )[0]
     reconstruction = output[0]
-    mse = np.mean((window_array[0] - reconstruction) ** 2)
+    mse = np.mean((window_array[0, -1] - reconstruction[-1]) ** 2)
     return float(mse)
 
 def report_anomaly(
