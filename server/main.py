@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas        import AnomalyEvent, AnomalyResponse, ServiceStatus, WebSocketMessage
+from schemas        import LogEvent, AnomalyResponse, ServiceStatus, WebSocketMessage
 from ws_manager     import WebSocketManager
 from anomaly_store  import  init_db, save_anomaly, get_anomalies, get_anomaly_count
 from redis_client   import  init_redis, record_anomaly, get_anomaly_rates_all, get_last_anomaly_time, SERVICES
@@ -51,6 +51,30 @@ async def health():
         "ws_clients":   ws_manager.connection_count,
     }
 
+import httpx
+
+@app.post("/inject/{service}/{anomaly_type}")
+async def inject_anomaly(service: str, anomaly_type: str):
+    port_map = {
+        "service-a": 8002,
+        "service-b": 8003,
+        "service-c": 8004
+    }
+    
+    if service not in port_map:
+        return {"error": "Invalid service"}
+        
+    port = port_map[service]
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(f"http://localhost:{port}/inject/{anomaly_type}", timeout=5.0)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"Failed to inject anomaly to {service}: {e}")
+        return {"error": str(e)}
+
 @app.get("/metrics")
 async def metrics():
     total       = get_anomaly_count()
@@ -58,10 +82,25 @@ async def metrics():
     per_service = {
         s: get_anomaly_count(s) for s in SERVICES
     }
+    
+    thresholds = {}
+    import numpy as np
+    import os
+    for s in SERVICES:
+        t_path = f"../ml/checkpoints/{s}/threshold.npy"
+        if os.path.exists(t_path):
+            t_val = float(np.load(t_path))
+            if s == "service-a": t_val *= 2.5
+            elif s in ["service-b", "service-c"]: t_val *= 1.5
+            thresholds[s] = round(t_val, 4)
+        else:
+            thresholds[s] = 0.0
+
     return {
         "total_anomalies":          total,
         "anomaly_rate_5min":        rates,
         "anomalies_per_service":    per_service,   
+        "thresholds":               thresholds,
     }
 
 @app.get("/anomalies", response_model=list[AnomalyResponse])
@@ -79,9 +118,9 @@ async def get_services():
     for service in SERVICES:
         rate = rates.get(service, 0)
 
-        if rate == 0:
+        if rate <= 30:
             status = "healthy"
-        elif rate <= 3:
+        elif rate <= 80:
             status = "warning"
         else:
             status = "critical"
@@ -96,31 +135,34 @@ async def get_services():
     return statuses
 
 @app.post("/anomaly")
-async def receive_anomaly(event: AnomalyEvent):
-    row_id  = save_anomaly(event)
-    record_anomaly(event.service, event.anomaly_score)
+async def receive_log(event: LogEvent):
+    row_id = None
+    if event.is_anomaly:
+        row_id  = save_anomaly(event)
+        record_anomaly(event.service, event.anomaly_score)
 
     ws_message = WebSocketMessage(
-        type            = "anomaly",
+        type            = "log",
         service         = event.service,
         timestamp       = event.timestamp,
         level           = event.level,
         message         = event.message,
         anomaly_score   = event.anomaly_score,
-        is_anomaly      = True,
+        is_anomaly      = event.is_anomaly,
         template        = event.template,
     )
 
     await ws_manager.broadcast(ws_message.model_dump())
 
-    logger.info(
-        f"Anomaly received and broadcast | "
-        f"id={row_id} service={event.service} score={event.anomaly_score:.4f}"
-    )
+    if event.is_anomaly:
+        logger.info(
+            f"Anomaly received and broadcast | "
+            f"id={row_id} service={event.service} score={event.anomaly_score:.4f}"
+        )
 
     return {
         "id":       row_id,
-        "status":   "recorded"
+        "status":   "recorded" if event.is_anomaly else "broadcasted"
     }
 
 @app.websocket("/ws/live")

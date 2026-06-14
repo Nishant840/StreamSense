@@ -2,7 +2,7 @@ import logging
 import psycopg2
 import psycopg2.extras
 from datetime import datetime
-from schemas import AnomalyEvent, AnomalyResponse
+from schemas import LogEvent, AnomalyResponse
 
 logger = logging.getLogger("anomaly-store")
 
@@ -46,7 +46,7 @@ def init_db() -> None:
         conn.commit()
     logger.info("Database intialized")
 
-def save_anomaly(event: AnomalyEvent) -> int:
+def save_anomaly(event: LogEvent) -> int:
     sql = """
             INSERT INTO anomalies
                 (service, timestamp, level, message, template, template_id, anomaly_score)

@@ -1,15 +1,16 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
-class AnomalyEvent(BaseModel):
+class LogEvent(BaseModel):
     service:        str
     timestamp:      str
     level:          str
     message:        str
     template:       Optional[str] = None
-    template_id:    Optional[int] = None
+    template_id:    Union[int, str, None] = None
     anomaly_score:  float
+    is_anomaly:     bool
 
 class AnomalyResponse(BaseModel):
     id:             int
@@ -18,7 +19,7 @@ class AnomalyResponse(BaseModel):
     level:          str
     message:        str
     template:       Optional[str] = None
-    template_id:    Optional[int] = None
+    template_id:    Union[int, str, None] = None
     anomaly_score:  float
     created_at:     datetime
 
@@ -37,3 +38,4 @@ class WebSocketMessage(BaseModel):
     anomaly_score:  float
     is_anomaly:     bool
     template:       Optional[str] = None
+    template_id:    Union[int, str, None] = None
