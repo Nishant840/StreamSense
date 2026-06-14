@@ -100,7 +100,7 @@ def get_recent_anomalies(limit: int = 50) -> list[dict]:
 
 def get_anomalies(service: str | None = None, limit: int = 50) -> list[AnomalyResponse]:
     query = """
-        SELECT service, timestamp, level, message, template, anomaly_score
+        SELECT id, service, timestamp, level, message, template, anomaly_score, created_at
         FROM anomalies
     """
     params = []
@@ -121,12 +121,14 @@ def get_anomalies(service: str | None = None, limit: int = 50) -> list[AnomalyRe
     for row in rows:
         anomalies.append(
             AnomalyResponse(
+                id              = row["id"],
                 service         = row["service"],
                 timestamp       = row["timestamp"],
                 level           = row["level"],
                 message         = row["message"],
                 anomaly_score   = row["anomaly_score"],
-                template        = row["template"]
+                template        = row["template"],
+                created_at      = row["created_at"]
             )
         )
     return anomalies
