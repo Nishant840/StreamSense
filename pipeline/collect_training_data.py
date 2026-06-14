@@ -80,6 +80,11 @@ def main():
 
     for service in SERVICES:
         data        = np.array(windows[service], dtype=np.float32)
+
+        # shuffle before splitting so errors distribute across all splits
+        rng = np.random.default_rng(seed=42)
+        rng.shuffle(data)
+        
         train_end   = int(len(data) * TRAIN_RATIO)
         val_end     = int(len(data) * (TRAIN_RATIO + VAL_RATIO))
 
