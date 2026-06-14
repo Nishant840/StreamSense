@@ -11,11 +11,16 @@ AGGREGATION_MS  = 60*1000       # 1 minute buckets
 
 SERVICES = ["service-a", "service-b", "service-c"]
 
+_redis_client = None
+
 def get_redis() -> redis.Redis:
-    return redis.from_url(
-        REDIS_URL,
-        decode_responses=True,
-    )
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+        )
+    return _redis_client
 
 def init_redis() -> None:
     r = get_redis()

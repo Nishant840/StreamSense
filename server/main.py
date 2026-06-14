@@ -138,7 +138,7 @@ async def receive_log(event: LogEvent):
     row_id = None
     if event.is_anomaly:
         row_id  = await asyncio.to_thread(save_anomaly, event.model_dump())
-        record_anomaly(event.service, event.anomaly_score)
+        await asyncio.to_thread(record_anomaly, event.service, event.anomaly_score)
 
     ws_message = WebSocketMessage(
         type            = "log",
