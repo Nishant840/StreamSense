@@ -27,7 +27,7 @@ def extract_features(parsed_log: dict) -> list[float]:
     level_encoded   = _encode_level(parsed_log.get("level", "INFO"))
     service_id      = _encode_service(parsed_log.get("service", ""))
     template_id     = _encode_template_id(parsed_log.get("template_id", 0))
-    response_time   = _extract_responce_time(parsed_log.get("message", ""))
+    response_time   = _extract_response_time(parsed_log.get("message", ""))
     is_error        = _is_error_message(parsed_log.get("message", ""))
     is_warning     = _is_warning_message(parsed_log.get("message", ""))
     log_length      = _encode_log_length(parsed_log.get("message", ""))
