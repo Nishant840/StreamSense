@@ -79,22 +79,19 @@ async def inject_anomaly(service: str, anomaly_type: str):
 
 @app.get("/metrics")
 async def metrics():
-    total       = get_anomaly_count()
+    total       = await asyncio.to_thread(get_anomaly_count)
     rates       = get_anomaly_rates_all()
-    per_service = {
-        s: get_anomaly_count(s) for s in SERVICES
-    }
-    
+    per_service = {}
+    for s in SERVICES:
+        per_service[s] = await asyncio.to_thread(get_anomaly_count, s)
+
     thresholds = {}
     import numpy as np
     import os
     for s in SERVICES:
         t_path = f"../ml/checkpoints/{s}/threshold.npy"
         if os.path.exists(t_path):
-            t_val = float(np.load(t_path))
-            if s == "service-a": t_val *= 2.5
-            elif s in ["service-b", "service-c"]: t_val *= 1.5
-            thresholds[s] = round(t_val, 4)
+            thresholds[s] = float(np.load(t_path))
         else:
             thresholds[s] = 0.0
 
@@ -110,7 +107,7 @@ async def get_anomalies_endpoint(
     service: str | None = Query(default=None),
     limit:   int        = Query(default=50, le=200),
 ):
-    return get_anomalies(service=service, limit=limit)
+    return await asyncio.to_thread(get_anomalies, service, limit)
 
 @app.get("/services", response_model=list[ServiceStatus])
 async def get_services():
@@ -140,7 +137,7 @@ async def get_services():
 async def receive_log(event: LogEvent):
     row_id = None
     if event.is_anomaly:
-        row_id  = save_anomaly(event)
+        row_id  = await asyncio.to_thread(save_anomaly, event.model_dump())
         record_anomaly(event.service, event.anomaly_score)
 
     ws_message = WebSocketMessage(
@@ -171,7 +168,7 @@ async def receive_log(event: LogEvent):
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
-        recent = get_anomalies(limit=20)
+        recent = await asyncio.to_thread(get_anomalies, None, 20)
         for anomaly in reversed(recent):
             await ws_manager.send_personal(
                 websocket,
