@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, Clock, Server } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const WS_URL = 'ws://localhost:8000/ws/live';
-const API_URL = 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://streamsense-ikg1.onrender.com';
+const WS_URL = API_URL.replace(/^http/, 'ws') + '/ws/live';
 
 export default function Dashboard() {
   const [logs, setLogs] = useState([]);
