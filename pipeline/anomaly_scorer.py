@@ -134,7 +134,9 @@ def main():
             report_anomaly(parsed_log, score, is_anomaly)
 
         except Exception as e:
-            logger.error(f"Error scoring log: {e}")
+            logger.error(f"Error scoring anomaly: {e}")
+            import time
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()

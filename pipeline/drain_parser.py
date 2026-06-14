@@ -66,6 +66,8 @@ def main():
 
         except Exception as e:
             logger.error(f"Error processing log: {e}")
+            import time
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()
