@@ -56,7 +56,7 @@ def _encode_service(service: str) -> float:
 def _encode_template_id(template_id: int) -> float:
     return min(template_id / 100.0, 1.0)
 
-def _extract_responce_time(message: str) -> float:
+def _extract_response_time(message: str) -> float:
     patterns = [
         r"latency=(\d+)ms",
         r"duration=(\d+)ms",
@@ -66,11 +66,12 @@ def _extract_responce_time(message: str) -> float:
         match = re.search(pattern, message)
         if match:
             value = float(match.group(1))
-            if "ms" in pattern:
-                return min(value / 10000.0, 1.0)
+            if "latency" in pattern:
+                return min(value / 2000.0, 1.0)
+            elif "ms" in pattern:
+                return min(value / 2000.0, 1.0)
             else:
                 return min(value / 300.0, 1.0)
-            
     return 0.0
 
 def _is_error_message(message: str) -> float:
