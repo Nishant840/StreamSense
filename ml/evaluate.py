@@ -23,24 +23,24 @@ def inject_error_spike(window: np.ndarray) -> np.ndarray:
     # level feature → ERROR (0.75), is_error → 1.0
     for i in range(20, 50):
         window[i][0] = 0.75     # level = ERROR
-        window[i][6] = 1.0      # is_error = 1.0
-        window[i][5] = 0.001    # very low latency (connection refused)
+        window[i][4] = 1.0      # is_error = 1.0
+        window[i][3] = 0.001    # very low latency (connection refused)
     return window
 
 def inject_slowdown(window: np.ndarray) -> np.ndarray:
     window = window.copy()
     # response_time feature → 10x normal (clamped to 1.0)
     for i in range(window.shape[0]):
-        window[i][5] = min(window[i][5] * 10, 1.0)
+        window[i][3] = min(window[i][3] * 10, 1.0)
     return window
 
 def inject_unknown_template(window: np.ndarray) -> np.ndarray:
     window = window.copy()
     # template_id feature → very high value never seen in training
     for i in range(10, 40):
-        window[i][4] = 0.99   # template_id = 99 (unknown)
+        window[i][2] = 0.99   # template_id = 99 (unknown)
         window[i][0] = 0.75   # ERROR level
-        window[i][6] = 1.0    # is_eror
+        window[i][4] = 1.0    # is_eror
     return window
 
 def inject_memory_leak(window: np.ndarray) -> np.ndarray:
@@ -48,8 +48,8 @@ def inject_memory_leak(window: np.ndarray) -> np.ndarray:
     # gradually increasing response times simulating memory pressure
     for i in range(window.shape[0]):
         leak_factor     = 1.0 + (i / window.shape[0]) * 9.0
+        window[i][3]    = min(window[i][3] * leak_factor, 1.0)
         window[i][5]    = min(window[i][5] * leak_factor, 1.0)
-        window[i][7]    = min(window[i][7] * leak_factor, 1.0)
     return window
 
 def score_window(
@@ -59,7 +59,7 @@ def score_window(
     tensor = torch.tensor(window, dtype=torch.float32).unsqueeze(0).to(DEVICE)
     with torch.no_grad():
         recon = model(tensor)
-        loss  = nn.MSELoss()(recon, tensor)
+        loss  = torch.mean((recon[0, -1] - tensor[0, -1]) ** 2)
     return loss.item()
 
 

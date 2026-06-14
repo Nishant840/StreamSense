@@ -11,7 +11,7 @@ BATCH_SIZE      = 32
 EPOCHS          = 40
 LEARNING_RATE   = 1e-3
 TRAIN_SPLIT     = 0.8
-THRESHOLD_PCT   = 97
+THRESHOLD_PCT   = 99
 
 SERVICES = ["service-a", "service-b", "service-c"]
 
@@ -120,9 +120,9 @@ def calculate_threshold(
             batch = batch.to(DEVICE)
             recon = model(batch)
 
-            for i in range(batch.shape[0]):
-                loss = nn.MSELoss()(recon[i], batch[i])
-                all_losses.append(loss.item())
+            mse_per_log = torch.mean((recon - batch)**2, dim=2)
+            last_log_mse = mse_per_log[:, -1]
+            all_losses.extend(last_log_mse.cpu().tolist())
 
     threshold = float(np.percentile(all_losses, THRESHOLD_PCT))
     svc_dir   = f"{CHECKPOINT_DIR}/{service}"
