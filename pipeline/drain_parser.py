@@ -1,8 +1,9 @@
 import json
 import logging
-from kafka import KafkaConsumer, KafkaProducer
 from drain3 import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
+import redis
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,20 +21,9 @@ def build_template_miner() -> TemplateMiner:
 
     return TemplateMiner(config=config)
 
-def build_consumer() -> KafkaConsumer:
-    return KafkaConsumer(
-        "raw-logs",
-        bootstrap_servers="localhost:29092",
-        group_id="drain-parser-group",
-        auto_offset_reset="earliest",
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-    )
-
-def build_producer() -> KafkaProducer:
-    return KafkaProducer(
-        bootstrap_servers="localhost:29092",
-        value_serializer = lambda v: json.dumps(v).encode("utf-8")
-    )
+def build_redis_client() -> redis.Redis:
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    return redis.Redis.from_url(redis_url, decode_responses=True)
 
 def parse_logs(template_miner: TemplateMiner, raw_log: dict) -> dict:
     message = raw_log.get("message", "")
@@ -56,15 +46,26 @@ def main():
     logger.info("Drain parser starting...")
 
     template_miner = build_template_miner()
-    consumer       = build_consumer()
-    producer       = build_producer()
+    r              = build_redis_client()
+    
+    logger.info("Listening for logs on Redis 'raw-logs' list...")
 
-    logger.info("Connected to kafka. Consuming from raw-logs...")
+    while True:
+        try:
+            # brpop blocks until an item is available
+            result = r.brpop("raw-logs", timeout=5)
+            if not result:
+                continue
+                
+            _, raw_json = result
+            raw_log = json.loads(raw_json)
+            
+            parsed_log = parse_logs(template_miner, raw_log)
+            
+            r.lpush("parsed-logs", json.dumps(parsed_log))
 
-    for message in consumer:
-        raw_log         = message.value
-        parsed_log      = parse_logs(template_miner, raw_log)
-        producer.send("parsed-logs", value=parsed_log)
+        except Exception as e:
+            logger.error(f"Error processing log: {e}")
 
 if __name__ == "__main__":
     main()

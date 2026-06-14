@@ -1,20 +1,19 @@
 import logging
 import redis
+import os
 from datetime import datetime, timezone
 
 logger = logging.getLogger("redis-client")
 
-REDIS_HOST      = "localhost"
-REDIS_PORT      = 6379
+REDIS_URL       = os.getenv("REDIS_URL", "redis://localhost:6379")
 RETENTION_MS    = 24*60*60*1000 # 24hour in millisecond
 AGGREGATION_MS  = 60*1000       # 1 minute buckets
 
 SERVICES = ["service-a", "service-b", "service-c"]
 
 def get_redis() -> redis.Redis:
-    return redis.Redis(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
+    return redis.from_url(
+        REDIS_URL,
         decode_responses=True,
     )
 

@@ -3,9 +3,10 @@ import random
 import time
 import schedule
 import threading
+import os
 from fastapi import FastAPI
 import uvicorn
-from kafka_handler import KafkaLoggingHandler
+from redis_handler import RedisLoggingHandler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,11 +14,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("service-c")
 
-kafka_handler = KafkaLoggingHandler(
-    bootstrap_servers="kafka:9092",
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_handler = RedisLoggingHandler(
+    redis_url=redis_url,
     topic="raw-logs"
 )
-logger.addHandler(kafka_handler)
+logger.addHandler(redis_handler)
 
 cpu_usage = 0.0
 memory_usage = 0.0

@@ -4,7 +4,8 @@ import httpx
 import numpy as np
 import onnxruntime as ort
 from collections import defaultdict, deque
-from kafka import KafkaConsumer
+import redis
+import os
 
 from feature_extractor import extract_features
 
@@ -16,12 +17,8 @@ logger = logging.getLogger("anomaly-scorer")
 
 CHECKPOINT_DIR  = "../ml/checkpoints"
 SERVICES        = ["service-a", "service-b", "service-c"]
-KAFKA_BOOTSTRAP = "localhost:29092"
-PARSED_TOPIC    = "parsed-logs"
-GROUP_ID        = "anomaly-scorer-group-v2"
 WINDOW_SIZE     = 50
 FASTAPI_URL     = "http://localhost:8000/anomaly"
-
 
 def load_model() -> tuple[
     dict[str, ort.InferenceSession],
@@ -48,15 +45,9 @@ def load_model() -> tuple[
 
     return sessions, thresholds
 
-def build_consumer() -> KafkaConsumer:
-    return KafkaConsumer(
-        PARSED_TOPIC,
-        bootstrap_servers = KAFKA_BOOTSTRAP,
-        group_id=GROUP_ID,
-        auto_offset_reset="latest",
-        enable_auto_commit=False,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8"))
-    )
+def build_redis_client() -> redis.Redis:
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    return redis.Redis.from_url(redis_url, decode_responses=True)
 
 def score_window(
         session: ort.InferenceSession,
@@ -95,33 +86,41 @@ def report_anomaly(
 
 def main():
     logger.info("Anomaly scorer starting...")
+
     sessions, thresholds = load_model()
-    consumer           = build_consumer()
+    r = build_redis_client()
 
-    windows: dict[str, deque] = defaultdict(
-        lambda: deque(maxlen=WINDOW_SIZE)
-    )
+    window_size = 50
+    windows = {
+        s: deque(maxlen=window_size) for s in SERVICES
+    }
+    
+    logger.info("Listening for parsed logs on Redis 'parsed-logs' list...")
 
-    logger.info(f"Consuming from {PARSED_TOPIC}...")
+    while True:
+        try:
+            result = r.brpop("parsed-logs", timeout=5)
+            if not result:
+                continue
+                
+            _, parsed_json = result
+            parsed_log = json.loads(parsed_json)
+            
+            service     = parsed_log.get("service")
+            
+            if service not in windows:
+                continue
 
-    for message in consumer:
-        parsed_log = message.value
-        service    = parsed_log.get("service", "unknown")
+            features = extract_features(parsed_log)
+            windows[service].append(features)
 
-        if service not in sessions:
-            consumer.commit()
-            continue
-
-        features   = extract_features(parsed_log)
-
-        windows[service].append(features)
-
-        if len(windows[service]) == WINDOW_SIZE:
-            session   = sessions[service]
-            threshold = thresholds[service]
-            score     = score_window(session, windows[service])
-
-            print(f"service={service} score={score:.6f} threshold={threshold:.6f}")
+            if len(windows[service]) < window_size:
+                continue
+                
+            session     = sessions.get(service)
+            threshold   = thresholds.get(service)
+            
+            score       = score_window(session, windows[service])
 
             is_anomaly = score > threshold
             if is_anomaly:
@@ -133,7 +132,8 @@ def main():
                 )
             report_anomaly(parsed_log, score, is_anomaly)
 
-        consumer.commit()
+        except Exception as e:
+            logger.error(f"Error scoring log: {e}")
 
 if __name__ == "__main__":
     main()

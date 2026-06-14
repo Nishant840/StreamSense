@@ -1,9 +1,10 @@
 import logging
 import random
 import asyncio
+import os
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from kafka_handler import KafkaLoggingHandler
+from redis_handler import RedisLoggingHandler
 
 logging.basicConfig(
     level = logging.INFO,
@@ -11,11 +12,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("service-a")
 
-kafka_handler = KafkaLoggingHandler(
-    bootstrap_servers="kafka:9092",
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_handler = RedisLoggingHandler(
+    redis_url=redis_url,
     topic="raw-logs"
 )
-logger.addHandler(kafka_handler)
+logger.addHandler(redis_handler)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

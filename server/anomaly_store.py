@@ -6,16 +6,15 @@ from schemas import LogEvent, AnomalyResponse
 
 logger = logging.getLogger("anomaly-store")
 
-DB_CONFIG = {
-    "dbname":   "streamsense",
-    "user":     "streamsense",
-    "password": "streamsense123",
-    "host":     "localhost",
-    "port":     5432
-}
+import os
+
+DB_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://postgres:postgres@localhost:5432/streamsense"
+)
 
 def get_connection() -> psycopg2.extensions.connection:
-    return psycopg2.connect(**DB_CONFIG)
+    return psycopg2.connect(DB_URL)
 
 def init_db() -> None:
     sql = """
