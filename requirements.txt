@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+psycopg2-binary
+redis
+httpx
+pydantic
+schedule
+drain3
+onnxruntime
+numpy
