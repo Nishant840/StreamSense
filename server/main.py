@@ -80,7 +80,7 @@ async def inject_anomaly(service: str, anomaly_type: str):
 @app.get("/metrics")
 async def metrics():
     total       = await asyncio.to_thread(get_anomaly_count)
-    rates       = get_anomaly_rates_all()
+    rates       = await asyncio.to_thread(get_anomaly_rates_all)
     per_service = {}
     for s in SERVICES:
         per_service[s] = await asyncio.to_thread(get_anomaly_count, s)
@@ -111,7 +111,7 @@ async def get_anomalies_endpoint(
 
 @app.get("/services", response_model=list[ServiceStatus])
 async def get_services():
-    rates    = get_anomaly_rates_all()
+    rates    = await asyncio.to_thread(get_anomaly_rates_all)
     statuses = []
 
     for service in SERVICES:
@@ -123,12 +123,14 @@ async def get_services():
             status = "warning"
         else:
             status = "critical"
+            
+        last_time = await asyncio.to_thread(get_last_anomaly_time, service)
 
         statuses.append(ServiceStatus(
             service         = service,
             status          = status,
             anomaly_rate    = rate,
-            last_anomaly    = get_last_anomaly_time(service),
+            last_anomaly    = last_time,
         ))
     
     return statuses
