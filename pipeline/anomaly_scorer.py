@@ -18,7 +18,10 @@ logger = logging.getLogger("anomaly-scorer")
 CHECKPOINT_DIR  = "../ml/checkpoints"
 SERVICES        = ["service-a", "service-b", "service-c"]
 WINDOW_SIZE     = 50
-FASTAPI_URL     = "http://localhost:8000/anomaly"
+
+# Render sets the PORT env var dynamically. We must post to whatever port the FastAPI server is running on.
+port            = os.getenv("PORT", "8000")
+FASTAPI_URL     = f"http://localhost:{port}/anomaly"
 
 def load_model() -> tuple[
     dict[str, ort.InferenceSession],

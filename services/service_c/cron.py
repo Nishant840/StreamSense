@@ -6,6 +6,7 @@ import threading
 import os
 from fastapi import FastAPI
 import uvicorn
+from contextlib import asynccontextmanager
 from redis_handler import RedisLoggingHandler
 
 logging.basicConfig(
@@ -89,7 +90,22 @@ def job_cache_refresh():
         f"Cache refresh completed | keys={keys_refreshed} duration={duration_ms}ms"
     )
 
-app = FastAPI()
+def run_scheduler():
+    schedule.every(1).seconds.do(job_health_check)
+    schedule.every(3).seconds.do(job_cleanup)
+    schedule.every(5).seconds.do(job_db_backup)
+    schedule.every(2).seconds.do(job_cache_refresh)
+    logger.info("Cron scheduler started")
+    while True:
+        schedule.run_pending()
+        time.sleep(random.uniform(0.3, 0.8))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=run_scheduler, daemon=True).start()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health():
@@ -101,24 +117,3 @@ def inject_error_spike():
         logger.error("Database backup failed | duration=0s error=ManualInjectionSpike")
         time.sleep(0.1)
     return {"injected": "error-spike"}
-
-def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)
-
-# Schedule jobs
-schedule.every(1).seconds.do(job_health_check)
-schedule.every(3).seconds.do(job_cleanup)
-schedule.every(5).seconds.do(job_db_backup)
-schedule.every(2).seconds.do(job_cache_refresh)
-
-def main():
-    api_thread = threading.Thread(target=run_api, daemon=True)
-    api_thread.start()
-
-    logger.info("Cron scheduler started")
-    while True:
-        schedule.run_pending()
-        time.sleep(random.uniform(0.3, 0.8))
-
-if __name__ == "__main__":
-    main()

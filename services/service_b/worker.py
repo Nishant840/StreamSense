@@ -5,6 +5,7 @@ import threading
 import os
 from fastapi import FastAPI
 import uvicorn
+from contextlib import asynccontextmanager
 from redis_handler import RedisLoggingHandler
 
 logging.basicConfig(
@@ -54,7 +55,19 @@ def process_job(job_type: str) -> None:
             f"Job completed | job={job_type} duration={duration}ms"
         )
 
-app = FastAPI()
+def run_jobs():
+    logger.info("Worker started - waiting for jobs")
+    while True:
+        job = random.choice(JOB_TYPES)
+        process_job(job)
+        time.sleep(random.uniform(0.3, 0.8))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=run_jobs, daemon=True).start()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health():
@@ -66,19 +79,3 @@ def inject_error_spike():
         logger.error("Job failed | job=critical_task duration=0ms error=ManualInjectionSpike")
         time.sleep(0.1)
     return {"injected": "error-spike"}
-
-def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)
-
-def main():
-    api_thread = threading.Thread(target=run_api, daemon=True)
-    api_thread.start()
-
-    logger.info("Worker started - waiting for jobs")
-    while True:
-        job = random.choice(JOB_TYPES)
-        process_job(job)
-        time.sleep(random.uniform(0.3, 0.8))
-
-if __name__ == "__main__":
-    main()
