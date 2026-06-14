@@ -34,6 +34,12 @@ def load_model() -> tuple[
         svc_dir     = f"{CHECKPOINT_DIR}/{service}"
         session     = ort.InferenceSession(f"{svc_dir}/model.onnx")
         threshold   = float(np.load(f"{svc_dir}/threshold.npy"))
+        # Increase threshold to reduce false positives without retraining
+        if service == "service-a":
+            threshold *= 2.5
+        elif service == "service-b" or service == "service-c":
+            threshold *= 1.5
+
         sessions[service]   = session
         thresholds[service] = threshold
         logger.info(
@@ -68,7 +74,8 @@ def score_window(
 
 def report_anomaly(
         parsed_log: dict,
-        anomaly_score: float
+        anomaly_score: float,
+        is_anomaly: bool
 ) -> None:
     payload = {
         "service":          parsed_log.get("service"),
@@ -77,13 +84,14 @@ def report_anomaly(
         "message":          parsed_log.get("message"),
         "template":         parsed_log.get("template"),
         "template_id":      parsed_log.get("template_id"),
-        "anomaly_score":    anomaly_score,    
+        "anomaly_score":    anomaly_score,
+        "is_anomaly":       is_anomaly,
     }
     try:
         responce = httpx.post(FASTAPI_URL, json=payload, timeout=5.0)
         responce.raise_for_status()
     except Exception as e:
-        logger.error(f"Failed to report anomaly: {e}")
+        logger.error(f"Failed to report anomaly: {e} - Response: {responce.text if 'responce' in locals() else ''}")
 
 def main():
     logger.info("Anomaly scorer starting...")
@@ -115,14 +123,15 @@ def main():
 
             print(f"service={service} score={score:.6f} threshold={threshold:.6f}")
 
-            if score > threshold:
+            is_anomaly = score > threshold
+            if is_anomaly:
                 logger.warning(
                     f"ANOMALY DETECTED | "
                     f"service={service} "
                     f"score={score:.6f} | "
                     f"msg={parsed_log.get('message', '')[:50]}"
                 )
-                report_anomaly(parsed_log, score)
+            report_anomaly(parsed_log, score, is_anomaly)
 
         consumer.commit()
 
