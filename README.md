@@ -1,5 +1,4 @@
 
-<div align="center">  
   
 # StreamSense  
   
@@ -11,7 +10,6 @@ Detect abnormal system behavior from distributed microservices using Drain3 log 
   
 👉 https://stream-sense-ten.vercel.app/  
   
-</div>.
 
 ## Highlights
 
