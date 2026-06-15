@@ -8,3 +8,4 @@ schedule
 drain3
 onnxruntime
 numpy
+websockets
