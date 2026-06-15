@@ -3,4 +3,5 @@ uvicorn
 psycopg2-binary
 redis
 httpx
-pydanticwebsockets
+pydantic
+websockets
