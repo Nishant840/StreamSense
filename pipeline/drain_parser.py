@@ -52,17 +52,20 @@ def main():
 
     while True:
         try:
-            # brpop blocks until an item is available
-            result = r.brpop("raw-logs", timeout=5)
-            if not result:
-                continue
+            results = r.lpop("raw-logs", count=50)
+            if not results:
+                result = r.brpop("raw-logs", timeout=5)
+                if not result:
+                    continue
+                results = [result[1]]
                 
-            _, raw_json = result
-            raw_log = json.loads(raw_json)
+            pipeline = r.pipeline()
+            for raw_json in results:
+                raw_log = json.loads(raw_json)
+                parsed_log = parse_logs(template_miner, raw_log)
+                pipeline.lpush("parsed-logs", json.dumps(parsed_log))
             
-            parsed_log = parse_logs(template_miner, raw_log)
-            
-            r.lpush("parsed-logs", json.dumps(parsed_log))
+            pipeline.execute()
 
         except Exception as e:
             logger.error(f"Error processing log: {e}")

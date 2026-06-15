@@ -50,6 +50,10 @@ def record_anomaly(service: str, score: float) -> None:
             score,
             retention_msecs=RETENTION_MS,
         )
+    except redis.exceptions.ResponseError as e:
+        if "TSDB: key does not exist" in str(e):
+            r.ts().create(key, retention_msecs=RETENTION_MS, labels={"service": service, "metric": "anomaly_rate"})
+            r.ts().add(key, ts, score)
     except Exception as e:
         logger.error(f"Failed to record anomaly in Redis: {e}")
 

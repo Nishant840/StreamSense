@@ -32,7 +32,6 @@ def load_model() -> tuple[
         svc_dir     = f"{CHECKPOINT_DIR}/{service}"
         session     = ort.InferenceSession(f"{svc_dir}/model.onnx")
         threshold   = float(np.load(f"{svc_dir}/threshold.npy"))
-        # Increase threshold to reduce false positives without retraining
         if service == "service-a":
             threshold *= 2.5
         elif service == "service-b" or service == "service-c":
@@ -67,7 +66,8 @@ def score_window(
 def report_anomaly(
         parsed_log: dict,
         anomaly_score: float,
-        is_anomaly: bool
+        is_anomaly: bool,
+        client: httpx.Client
 ) -> None:
     payload = {
         "service":          parsed_log.get("service"),
@@ -80,10 +80,10 @@ def report_anomaly(
         "is_anomaly":       is_anomaly,
     }
     try:
-        responce = httpx.post(FASTAPI_URL, json=payload, timeout=5.0)
+        responce = client.post(FASTAPI_URL, json=payload, timeout=5.0)
         responce.raise_for_status()
     except Exception as e:
-        logger.error(f"Failed to report anomaly: {e} - Response: {responce.text if 'responce' in locals() else ''}")
+        logger.error(f"Failed to report anomaly: {e}")
 
 def main():
     logger.info("Anomaly scorer starting...")
@@ -98,45 +98,47 @@ def main():
     
     logger.info("Listening for parsed logs on Redis 'parsed-logs' list...")
 
-    while True:
-        try:
-            result = r.brpop("parsed-logs", timeout=5)
-            if not result:
-                continue
+    with httpx.Client() as client:
+        while True:
+            try:
+                results = r.lpop("parsed-logs", count=50)
+                if not results:
+                    result = r.brpop("parsed-logs", timeout=5)
+                    if not result:
+                        continue
+                    results = [result[1]]
                 
-            _, parsed_json = result
-            parsed_log = json.loads(parsed_json)
-            
-            service     = parsed_log.get("service")
-            
-            if service not in windows:
-                continue
+                for parsed_json in results:
+                    parsed_log = json.loads(parsed_json)
+                    service = parsed_log.get("service")
+                    
+                    if service not in windows:
+                        continue
 
-            features = extract_features(parsed_log)
-            windows[service].append(features)
+                    features = extract_features(parsed_log)
+                    windows[service].append(features)
 
-            if len(windows[service]) < window_size:
-                continue
-                
-            session     = sessions.get(service)
-            threshold   = thresholds.get(service)
-            
-            score       = score_window(session, windows[service])
+                    if len(windows[service]) < window_size:
+                        continue
+                        
+                    session     = sessions.get(service)
+                    threshold   = thresholds.get(service)
+                    
+                    score       = score_window(session, windows[service])
+                    is_anomaly = score > threshold
+                    if is_anomaly:
+                        logger.warning(
+                            f"ANOMALY DETECTED | "
+                            f"service={service} "
+                            f"score={score:.6f} | "
+                            f"msg={parsed_log.get('message', '')[:50]}"
+                        )
+                    report_anomaly(parsed_log, score, is_anomaly, client)
 
-            is_anomaly = score > threshold
-            if is_anomaly:
-                logger.warning(
-                    f"ANOMALY DETECTED | "
-                    f"service={service} "
-                    f"score={score:.6f} | "
-                    f"msg={parsed_log.get('message', '')[:50]}"
-                )
-            report_anomaly(parsed_log, score, is_anomaly)
-
-        except Exception as e:
-            logger.error(f"Error scoring anomaly: {e}")
-            import time
-            time.sleep(5)
+            except Exception as e:
+                logger.error(f"Error scoring anomaly: {e}")
+                import time
+                time.sleep(5)
 
 if __name__ == "__main__":
     main()
