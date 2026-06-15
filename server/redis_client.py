@@ -1,15 +1,14 @@
-import logging
-import redis
 import os
+import logging
 from datetime import datetime, timezone
+import redis
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("redis-client")
 
-REDIS_URL       = os.getenv("REDIS_URL", "redis://localhost:6379")
-RETENTION_MS    = 24*60*60*1000 # 24hour in millisecond
-AGGREGATION_MS  = 60*1000       # 1 minute buckets
-
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 SERVICES = ["service-a", "service-b", "service-c"]
+RETENTION_MS = 60 * 60 * 1000  # 1 hour
 
 _redis_client = None
 
@@ -24,36 +23,22 @@ def get_redis() -> redis.Redis:
         )
     return _redis_client
 
-def init_redis() -> None:
+def init_redis():
     r = get_redis()
-    for service in SERVICES:
-        key = f"anomaly_rate:{service}"
-        try:
-            r.ts().create(
-                key,
-                retention_msecs=RETENTION_MS,
-                labels={"service": service, "metric":"anomaly_rate"},
-            )
-            logger.info(f"Created TimeSeries key: {key}")
-        except Exception:
-            logger.info(f"TimeSeries key already exists: {key}")
+    logger.info("Connected to Redis successfully.")
 
 def record_anomaly(service: str, score: float) -> None:
     r   = get_redis()
-    key = f"anomaly_rate:{service}"
-    ts  = int(datetime.now(timezone.utc).timestamp()*1000)
+    key = f"anomaly_zset:{service}"
+    ts  = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     try:
-        r.ts().add(
-            key,
-            ts,
-            score,
-            retention_msecs=RETENTION_MS,
-        )
-    except redis.exceptions.ResponseError as e:
-        if "TSDB: key does not exist" in str(e):
-            r.ts().create(key, retention_msecs=RETENTION_MS, labels={"service": service, "metric": "anomaly_rate"})
-            r.ts().add(key, ts, score)
+        # ZADD key score member
+        # member must be unique, so we use ts:score
+        member = f"{ts}:{score}"
+        r.zadd(key, {member: ts})
+        # Remove items older than retention
+        r.zremrangebyscore(key, 0, ts - RETENTION_MS)
     except Exception as e:
         logger.error(f"Failed to record anomaly in Redis: {e}")
 
@@ -62,13 +47,13 @@ def get_anomaly_rate(
     window_mins: int = 5,
 ) -> float:
     r       = get_redis()
-    key     = f"anomaly_rate:{service}"
-    now_ms  = int(datetime.now(timezone.utc).timestamp()*1000)
-    from_ms = now_ms - (window_mins*60*1000)
+    key     = f"anomaly_zset:{service}"
+    now_ms  = int(datetime.now(timezone.utc).timestamp() * 1000)
+    from_ms = now_ms - (window_mins * 60 * 1000)
 
     try:
-        samples = r.ts().range(key, from_ms, now_ms)
-        return len(samples)
+        count = r.zcount(key, from_ms, now_ms)
+        return float(count)
     except Exception as e:
         logger.error(f"Failed to get anomaly rate: {e}")
         return 0.0
@@ -81,16 +66,15 @@ def get_anomaly_rates_all() -> dict[str, float]:
 
 def get_last_anomaly_time(service: str) -> str | None:
     r       = get_redis()
-    key     = f"anomaly_rate:{service}"
-    now_ms  = int(datetime.now(timezone.utc).timestamp()*1000)
-    from_ms = now_ms - (24*60*60*1000)
+    key     = f"anomaly_zset:{service}"
 
     try:
-        samples = r.ts().range(key, from_ms, now_ms)
+        # Get the highest score (most recent timestamp)
+        samples = r.zrange(key, -1, -1, withscores=True)
         if samples:
-            last_ts_ms = samples[-1][0]
+            member, last_ts_ms = samples[0]
             last_ts    = datetime.fromtimestamp(
-                last_ts_ms/1000,
+                last_ts_ms / 1000.0,
                 tz=timezone.utc,
             )
             return last_ts.isoformat()
