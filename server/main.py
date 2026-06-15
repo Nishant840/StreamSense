@@ -190,3 +190,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
+@app.websocket("/ws/test")
+async def ws_test(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.send_text("Hello")
+    await websocket.close()
